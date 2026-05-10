@@ -38,6 +38,9 @@ from datetime import datetime
 from collections import deque
 import logging
 
+# Resource Manager for Low-VRAM sequential loading
+from resource_manager import resource_manager
+
 # MCP SDK
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -161,12 +164,18 @@ class HierarchicalPlanner:
 
         Generate the task decomposition tree."""
 
+        # Sequential loading: Load Head model before generation
+        await self.head.ensure_model_loaded()
+        
         plan_json = await self.head.generate(
             system_prompt=self.PLANNING_PROMPT,
             user_prompt=prompt,
             temperature=0.3,  # Low temp for structured planning
             max_tokens=4000
         )
+        
+        # Unload Head after planning to free VRAM
+        await self.head.unload_model_if_needed()
 
         try:
             tasks_data = json.loads(self._extract_json(plan_json))
@@ -531,12 +540,18 @@ class IntelligentOrchestrator:
         Return JSON array of tool calls: [{{"tool": "name", "params": {{}}}}]
         """
 
+        # Sequential loading: Load Head model
+        await self.head.ensure_model_loaded()
+        
         decision = await self.head.generate(
             system_prompt="You are a tool router. Return ONLY valid JSON.",
             user_prompt=prompt,
             temperature=0.1,
             max_tokens=1000
         )
+        
+        # Unload Head after decision
+        await self.head.unload_model_if_needed()
 
         try:
             return json.loads(self._extract_json(decision))
@@ -566,13 +581,21 @@ class IntelligentOrchestrator:
         system_prompt = self._build_system_prompt(task, "creative")
         user_prompt = self._build_user_prompt(task, context, tool_results)
 
-        return await self.head.generate(
+        # Sequential loading: Load Head model
+        await self.head.ensure_model_loaded()
+        
+        result = await self.head.generate(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             temperature=task.temperature,
             rep_pen=task.rep_penalty,
             max_tokens=min(task.estimated_tokens * 2, 8000)
         )
+        
+        # Unload Head after generation
+        await self.head.unload_model_if_needed()
+        
+        return result
 
     async def _run_critic(self, task: TaskNode, context: dict, tool_results: dict) -> str:
         """Execute analytical task with critic model."""
@@ -580,13 +603,21 @@ class IntelligentOrchestrator:
         system_prompt = self._build_system_prompt(task, "analytical")
         user_prompt = self._build_user_prompt(task, context, tool_results)
 
-        return await self.critic.generate(
+        # Sequential loading: Load Critic model
+        await self.critic.ensure_model_loaded()
+        
+        result = await self.critic.generate(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             temperature=0.3,
             rep_pen=1.05,
             max_tokens=4000
         )
+        
+        # Unload Critic after generation
+        await self.critic.unload_model_if_needed()
+        
+        return result
 
     async def _run_critic_review(self, task: TaskNode, draft: str, context: dict) -> str:
         """Run critic review on head model output and integrate feedback."""
@@ -612,6 +643,9 @@ class IntelligentOrchestrator:
         }}
         """
 
+        # Sequential loading: Load Critic model for review
+        await self.critic.ensure_model_loaded()
+        
         review = await self.critic.generate(
             system_prompt="You are a ruthless literary editor.",
             user_prompt=review_prompt,
@@ -625,6 +659,12 @@ class IntelligentOrchestrator:
             task.critique = review_data
 
             if review_data.get("score", 1.0) < 0.8:
+                # Unload Critic before loading Head for revision
+                await self.critic.unload_model_if_needed()
+                
+                # Load Head for revision
+                await self.head.ensure_model_loaded()
+                
                 # Auto-revise
                 revise_prompt = f"""Revise this draft based on editor feedback.
 
@@ -639,9 +679,16 @@ class IntelligentOrchestrator:
                     temperature=task.temperature,
                     max_tokens=8000
                 )
+                
+                # Unload Head after revision
+                await self.head.unload_model_if_needed()
+                
                 return revised
         except:
             pass
+        finally:
+            # Ensure Critic is unloaded
+            await self.critic.unload_model_if_needed()
 
         return draft
 
@@ -655,12 +702,18 @@ class IntelligentOrchestrator:
 
         Return ONLY a number between 0.0 and 1.0."""
 
+        # Sequential loading: Load Critic model
+        await self.critic.ensure_model_loaded()
+        
         score_text = await self.critic.generate(
             system_prompt="You are a quality rater. Return ONLY a float.",
             user_prompt=prompt,
             temperature=0.1,
             max_tokens=10
         )
+        
+        # Unload Critic after assessment
+        await self.critic.unload_model_if_needed()
 
         try:
             return float(score_text.strip())
@@ -679,12 +732,20 @@ class IntelligentOrchestrator:
 
         Produce the improved version."""
 
-        return await self.head.generate(
+        # Sequential loading: Load Head model for revision
+        await self.head.ensure_model_loaded()
+        
+        result = await self.head.generate(
             system_prompt="You are revising based on editorial feedback. Maintain voice, fix issues.",
             user_prompt=revise_prompt,
             temperature=task.temperature,
             max_tokens=8000
         )
+        
+        # Unload Head after revision
+        await self.head.unload_model_if_needed()
+        
+        return result
 
     async def _store_result(self, task: TaskNode, novel_state: "NovelState"):
         """Store task output to MemPalace via MCP."""
@@ -972,6 +1033,7 @@ class BaseModelClient:
         self.model = model_name
         self.api_key = api_key
         self.session = None
+        self._model_loaded = False  # Track if model is currently loaded in VRAM
 
     async def __aenter__(self):
         self.session = aiohttp.ClientSession()
@@ -980,6 +1042,28 @@ class BaseModelClient:
     async def __aexit__(self, *args):
         if self.session:
             await self.session.close()
+        # Unload model when session closes to free VRAM
+        if self._model_loaded:
+            resource_manager.unload_model(self)
+            self._model_loaded = False
+
+    async def ensure_model_loaded(self):
+        """
+        Ensure model is loaded in VRAM using sequential loading.
+        For remote endpoints, this just marks the model as 'active'.
+        """
+        if not self._model_loaded:
+            logger.info(f"Activating model: {self.model}")
+            # For remote API calls, we don't actually load weights locally
+            # but we track it for resource management purposes
+            self._model_loaded = True
+            
+    async def unload_model_if_needed(self):
+        """Unload model from VRAM to free resources."""
+        if self._model_loaded:
+            logger.info(f"Deactivating model: {self.model} to free VRAM")
+            resource_manager.unload_model(self)
+            self._model_loaded = False
 
     async def generate(
         self,
@@ -990,7 +1074,10 @@ class BaseModelClient:
         max_tokens: int = 4000,
         stop: list[str] = None
     ) -> str:
-        """Generate text from the model."""
+        """Generate text from the model with sequential loading."""
+        
+        # Ensure this model is active before generation
+        await self.ensure_model_loaded()
 
         payload = {
             "model": self.model,
@@ -1004,13 +1091,19 @@ class BaseModelClient:
             "stop": stop or []
         }
 
-        async with self.session.post(
-            f"{self.endpoint}/v1/chat/completions",
-            headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
-            json=payload
-        ) as resp:
-            data = await resp.json()
-            return data["choices"][0]["message"]["content"]
+        try:
+            async with self.session.post(
+                f"{self.endpoint}/v1/chat/completions",
+                headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
+                json=payload
+            ) as resp:
+                data = await resp.json()
+                return data["choices"][0]["message"]["content"]
+        finally:
+            # Unload after generation to free VRAM for next model
+            # Comment this out if you want to keep model loaded between calls
+            # await self.unload_model_if_needed()
+            pass
 
 
 class HeadModelClient(BaseModelClient):
@@ -1159,13 +1252,28 @@ class NovelForge:
         self.state = NovelState()
 
     async def initialize(self):
-        """Initialize all connections."""
+        """Initialize all connections with sequential model loading."""
         try:
             logger.info("🚀 Initializing NovelForge...")
+            logger.info(f"💾 VRAM Status: {resource_manager.get_vram_usage()}")
 
-            # Start model clients
+            # Sequential Model Loading for Low-VRAM (8GB) Systems
+            # Load Head model first
             await self.head.__aenter__()
+            logger.info("✅ Head model initialized")
+            logger.info(f"💾 VRAM after Head: {resource_manager.get_vram_usage()}")
+            
+            # Unload Head before loading Critic to save VRAM
+            # This ensures only one large model is in VRAM at a time
+            await self.head.unload_model_if_needed()
+            
+            # Load Critic model
             await self.critic.__aenter__()
+            logger.info("✅ Critic model initialized")
+            logger.info(f"💾 VRAM after Critic: {resource_manager.get_vram_usage()}")
+            
+            # Keep Critic unloaded initially; will load on-demand during review
+            await self.critic.unload_model_if_needed()
 
             # Start MCP client session (optional, with timeout)
             self.mcp_session = None
