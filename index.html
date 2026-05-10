@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NovelForge v2.1 — Agentic Novel Writer</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- APP CONTAINER -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div id="app">
+
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <!-- LEFT SIDEBAR (Hamburger + LLM Modes + Navigation) -->
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <aside id="left-sidebar" class="sidebar-left">
+            <!-- Hamburger Menu -->
+            <div class="sidebar-header">
+                <button id="hamburger-btn" class="hamburger" aria-label="Menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <div class="logo">
+                    <span class="logo-icon">✦</span>
+                    <span class="logo-text">NovelForge</span>
+                </div>
+            </div>
+
+            <!-- LLM Mode Indicators -->
+            <div class="llm-modes">
+                <div class="section-title">Active Models</div>
+
+                <div class="model-card" id="model-head" data-model="head">
+                    <div class="model-status" data-status="idle"></div>
+                    <div class="model-info">
+                        <div class="model-name">Head Model</div>
+                        <div class="model-spec">21B Deckard</div>
+                        <div class="model-temp">Temp: <span id="head-temp">1.0</span></div>
+                    </div>
+                    <div class="model-activity">
+                        <div class="activity-bar">
+                            <div class="activity-fill" id="head-activity"></div>
+                        </div>
+                        <span class="activity-label" id="head-activity-label">Idle</span>
+                    </div>
+                </div>
+
+                <div class="model-card" id="model-critic" data-model="critic">
+                    <div class="model-status" data-status="idle"></div>
+                    <div class="model-info">
+                        <div class="model-name">Critic Model</div>
+                        <div class="model-spec">14B Instruct</div>
+                        <div class="model-temp">Temp: <span id="critic-temp">0.3</span></div>
+                    </div>
+                    <div class="model-activity">
+                        <div class="activity-bar">
+                            <div class="activity-fill" id="critic-activity"></div>
+                        </div>
+                        <span class="activity-label" id="critic-activity-label">Idle</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation Menu -->
+            <nav class="nav-menu" id="nav-menu">
+                <div class="section-title">Workspace</div>
+                <a href="#" class="nav-item active" data-page="writer">
+                    <span class="nav-icon">📝</span>
+                    <span class="nav-text">Writer</span>
+                </a>
+                <a href="#" class="nav-item" data-page="outline">
+                    <span class="nav-icon">📋</span>
+                    <span class="nav-text">Outline</span>
+                </a>
+                <a href="#" class="nav-item" data-page="characters">
+                    <span class="nav-icon">👤</span>
+                    <span class="nav-text">Characters</span>
+                </a>
+                <a href="#" class="nav-item" data-page="research">
+                    <span class="nav-icon">🔍</span>
+                    <span class="nav-text">Research</span>
+                </a>
+                <a href="#" class="nav-item" data-page="continuity">
+                    <span class="nav-icon">🔗</span>
+                    <span class="nav-text">Continuity</span>
+                </a>
+                <a href="#" class="nav-item" data-page="registry">
+                    <span class="nav-icon">🧠</span>
+                    <span class="nav-text">Mistake Registry</span>
+                    <span class="badge" id="registry-badge">0</span>
+                </a>
+                <a href="#" class="nav-item" data-page="settings">
+                    <span class="nav-icon">⚙️</span>
+                    <span class="nav-text">Settings</span>
+                </a>
+            </nav>
+
+            <!-- Task Queue Mini -->
+            <div class="task-queue-mini">
+                <div class="section-title">Task Queue</div>
+                <div class="queue-list" id="queue-list">
+                    <div class="queue-empty">No active tasks</div>
+                </div>
+            </div>
+
+            <!-- Connection Status -->
+            <div class="connection-status">
+                <div class="status-dot" id="ws-status-dot"></div>
+                <span id="ws-status-text">Connecting...</span>
+            </div>
+        </aside>
+
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <!-- MAIN CONTENT AREA (75%) -->
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <main id="main-content" class="main-content">
+
+            <!-- PAGE: WRITER -->
+            <div class="page active" id="page-writer">
+                <!-- Novel Header -->
+                <header class="novel-header">
+                    <div class="novel-title-group">
+                        <h1 class="novel-title" id="novel-title" contenteditable="true"></h1>
+                        <div class="novel-meta">
+                            <span class="meta-item">
+                                <span class="meta-label">Genre</span>
+                                <span class="meta-value" id="novel-genre" contenteditable="true"></span>
+                            </span>
+                            <span class="meta-item">
+                                <span class="meta-label">Words</span>
+                                <span class="meta-value" id="word-count">0</span>
+                            </span>
+                            <span class="meta-item">
+                                <span class="meta-label">Chapters</span>
+                                <span class="meta-value" id="chapter-count">0</span>
+                            </span>
+                            <span class="meta-item">
+                                <span class="meta-label">Quality</span>
+                                <span class="meta-value" id="avg-quality">—</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="novel-actions">
+                        <button class="btn btn-secondary" id="btn-research">
+                            <span>🔍</span> Research
+                        </button>
+                        <button class="btn btn-primary" id="btn-generate">
+                            <span class="btn-icon">✨</span> Generate Chapter
+                        </button>
+                    </div>
+                </header>
+
+                <!-- Chapter Tabs -->
+                <div class="chapter-tabs">
+                    <div class="tabs-scroll" id="chapter-tabs">
+                        <button class="tab-btn add-tab" id="btn-add-chapter">+</button>
+                    </div>
+                    <div class="tab-actions">
+                        <button class="tab-action-btn" id="btn-outline-view" title="Outline View">📋</button>
+                        <button class="tab-action-btn" id="btn-split-view" title="Split View">◫</button>
+                        <button class="tab-action-btn" id="btn-fullscreen" title="Fullscreen">⛶</button>
+                    </div>
+                </div>
+
+                <!-- Writing Area -->
+                <div class="writing-container">
+                    <!-- Editor -->
+                    <div class="editor-panel" id="editor-panel">
+                        <div class="editor-toolbar">
+                            <div class="toolbar-group">
+                                <button class="tool-btn" data-cmd="bold" title="Bold"><b>B</b></button>
+                                <button class="tool-btn" data-cmd="italic" title="Italic"><i>I</i></button>
+                                <button class="tool-btn" data-cmd="underline" title="Underline"><u>U</u></button>
+                            </div>
+                            <div class="toolbar-separator"></div>
+                            <div class="toolbar-group">
+                                <button class="tool-btn" id="btn-critique" title="Run Critic Review">🔍 Review</button>
+                                <button class="tool-btn" id="btn-revise" title="Auto-Revise">🔄 Revise</button>
+                            </div>
+                            <div class="toolbar-separator"></div>
+                            <div class="toolbar-group">
+                                <select class="tool-select" id="select-pov">
+                                    <option value="">POV: Auto</option>
+                                    <option value="1st">1st Person</option>
+                                    <option value="3rd-limited">3rd Limited</option>
+                                    <option value="3rd-omni">3rd Omniscient</option>
+                                </select>
+                                <select class="tool-select" id="select-tone">
+                                    <option value="">Tone: Auto</option>
+                                    <option value="gritty">Gritty</option>
+                                    <option value="lyrical">Lyrical</option>
+                                    <option value="noir">Noir</option>
+                                    <option value="casual">Casual</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="editor-content" id="editor" contenteditable="true" spellcheck="false">
+                            <p class="placeholder">Click "Generate Chapter" to start writing, or begin typing...</p>
+                        </div>
+
+                        <!-- Real-time Generation Overlay -->
+                        <div class="generation-overlay" id="generation-overlay" style="display: none;">
+                            <div class="gen-indicator">
+                                <div class="gen-spinner"></div>
+                                <div class="gen-info">
+                                    <div class="gen-model" id="gen-model">Head Model (21B)</div>
+                                    <div class="gen-task" id="gen-task">Drafting scene...</div>
+                                    <div class="gen-progress">
+                                        <div class="gen-progress-bar" id="gen-progress-bar"></div>
+                                    </div>
+                                    <div class="gen-stats">
+                                        <span id="gen-tokens">0 tokens</span>
+                                        <span id="gen-time">0s</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="gen-stream" id="gen-stream"></div>
+                        </div>
+
+                        <!-- Critic Review Overlay -->
+                        <div class="critic-overlay" id="critic-overlay" style="display: none;">
+                            <div class="critic-header">
+                                <span class="critic-title">🔍 Critic Review</span>
+                                <button class="critic-close" id="critic-close">×</button>
+                            </div>
+                            <div class="critic-score" id="critic-score">0.00</div>
+                            <div class="critic-issues" id="critic-issues"></div>
+                        </div>
+                    </div>
+
+                    <!-- Outline Panel (collapsible) -->
+                    <div class="outline-panel" id="outline-panel" style="display: none;">
+                        <div class="panel-header">
+                            <span>Outline</span>
+                            <button class="panel-close" id="close-outline">×</button>
+                        </div>
+                        <div class="outline-content" id="outline-content">
+                            <div class="outline-empty">No outline yet. Generate one to see it here.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Status Bar -->
+                <div class="status-bar">
+                    <div class="status-left">
+                        <span class="status-item" id="status-task">Ready</span>
+                        <span class="status-separator">|</span>
+                        <span class="status-item" id="status-model">—</span>
+                        <span class="status-separator">|</span>
+                        <span class="status-item" id="status-tokens">0 tokens</span>
+                    </div>
+                    <div class="status-right">
+                        <span class="status-item" id="status-quality">Quality: —</span>
+                        <span class="status-separator">|</span>
+                        <span class="status-item" id="status-time">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PAGE: OUTLINE -->
+            <div class="page" id="page-outline">
+                <header class="page-header">
+                    <h2>📋 Novel Outline</h2>
+                    <button class="btn btn-primary" id="btn-generate-outline">Generate Outline</button>
+                </header>
+                <div class="outline-tree" id="outline-tree">
+                    <div class="outline-empty-state">
+                        <div class="empty-icon">🗺️</div>
+                        <p>No outline generated yet.</p>
+                        <button class="btn btn-primary" id="btn-gen-outline-2">Generate from Premise</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PAGE: CHARACTERS -->
+            <div class="page" id="page-characters">
+                <header class="page-header">
+                    <h2>👤 Character Manager</h2>
+                    <button class="btn btn-primary" id="btn-add-character">+ Add Character</button>
+                </header>
+                <div class="characters-grid" id="characters-grid">
+                    <div class="character-card placeholder-card" id="btn-add-char-card">
+                        <div class="char-add-icon">+</div>
+                        <div class="char-add-text">Add Character</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PAGE: RESEARCH -->
+            <div class="page" id="page-research">
+                <header class="page-header">
+                    <h2>🔍 Research</h2>
+                    <div class="research-input-group">
+                        <input type="text" class="research-input" id="research-query" placeholder="Research topic">
+                        <button class="btn btn-primary" id="btn-research-go">Crawl</button>
+                    </div>
+                </header>
+                <div class="research-results" id="research-results">
+                    <div class="research-empty">Enter a topic and click Crawl to research.</div>
+                </div>
+            </div>
+
+            <!-- PAGE: CONTINUITY -->
+            <div class="page" id="page-continuity">
+                <header class="page-header">
+                    <h2>🔗 Continuity Check</h2>
+                    <button class="btn btn-primary" id="btn-check-continuity">Run Check</button>
+                </header>
+                <div class="continuity-dashboard" id="continuity-dashboard">
+                    <div class="continuity-section">
+                        <h3>Timeline</h3>
+                        <div class="timeline" id="continuity-timeline"></div>
+                    </div>
+                    <div class="continuity-section">
+                        <h3>Character Consistency</h3>
+                        <div class="consistency-list" id="consistency-list"></div>
+                    </div>
+                    <div class="continuity-section">
+                        <h3>Plot Threads</h3>
+                        <div class="plot-threads" id="plot-threads"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PAGE: MISTAKE REGISTRY -->
+            <div class="page" id="page-registry">
+                <header class="page-header">
+                    <h2>🧠 Mistake Registry</h2>
+                    <div class="registry-stats" id="registry-header-stats">
+                        <span class="stat-pill">Total: <b id="reg-total">0</b></span>
+                        <span class="stat-pill critical">Critical: <b id="reg-critical">0</b></span>
+                        <span class="stat-pill major">Major: <b id="reg-major">0</b></span>
+                        <span class="stat-pill fixed">Fixed: <b id="reg-fixed">0</b></span>
+                    </div>
+                </header>
+                <div class="registry-content">
+                    <div class="registry-filters">
+                        <button class="filter-btn active" data-filter="all">All</button>
+                        <button class="filter-btn" data-filter="critical">Critical</button>
+                        <button class="filter-btn" data-filter="major">Major</button>
+                        <button class="filter-btn" data-filter="minor">Minor</button>
+                        <button class="filter-btn" data-filter="cosmetic">Cosmetic</button>
+                    </div>
+                    <div class="registry-list" id="registry-list">
+                        <div class="registry-empty">No mistakes recorded yet.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PAGE: SETTINGS -->
+            <div class="page" id="page-settings">
+                <header class="page-header">
+                    <h2>⚙️ Settings</h2>
+                </header>
+                <div class="settings-grid">
+                    <div class="settings-card">
+                        <h3>Head Model (21B)</h3>
+                        <div class="setting-row">
+                            <label>Endpoint</label>
+                            <input type="text" id="setting-head-endpoint" value="http://localhost:1234/v1">
+                        </div>
+                        <div class="setting-row">
+                            <label>Temperature</label>
+                            <input type="range" id="setting-head-temp" min="0" max="2" step="0.1" value="1.0">
+                            <span class="setting-value" id="setting-head-temp-val">1.0</span>
+                        </div>
+                        <div class="setting-row">
+                            <label>Rep Penalty</label>
+                            <input type="range" id="setting-head-rep" min="1" max="1.5" step="0.05" value="1.05">
+                            <span class="setting-value" id="setting-head-rep-val">1.05</span>
+                        </div>
+                        <div class="setting-row">
+                            <label>Context Window</label>
+                            <select id="setting-head-ctx">
+                                <option value="8192">8K</option>
+                                <option value="16384" selected>16K</option>
+                                <option value="32768">32K</option>
+                                <option value="65536">64K</option>
+                            </select>
+                        </div>
+                        <div class="setting-row">
+                            <label>Thinking Mode</label>
+                            <label class="toggle">
+                                <input type="checkbox" id="setting-head-thinking" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="settings-card">
+                        <h3>Critic Model (14B)</h3>
+                        <div class="setting-row">
+                            <label>Endpoint</label>
+                            <input type="text" id="setting-critic-endpoint" value="http://localhost:1235/v1">
+                        </div>
+                        <div class="setting-row">
+                            <label>Temperature</label>
+                            <input type="range" id="setting-critic-temp" min="0" max="1" step="0.1" value="0.3">
+                            <span class="setting-value" id="setting-critic-temp-val">0.3</span>
+                        </div>
+                        <div class="setting-row">
+                            <label>Quality Threshold</label>
+                            <input type="range" id="setting-quality-threshold" min="0" max="1" step="0.05" value="0.7">
+                            <span class="setting-value" id="setting-quality-val">0.70</span>
+                        </div>
+                        <div class="setting-row">
+                            <label>Max Revisions</label>
+                            <input type="number" id="setting-max-revisions" value="3" min="1" max="10">
+                        </div>
+                    </div>
+
+                    <div class="settings-card">
+                        <h3>Orchestrator</h3>
+                        <div class="setting-row">
+                            <label>Max Parallel Tasks</label>
+                            <input type="number" id="setting-max-parallel" value="3" min="1" max="10">
+                        </div>
+                        <div class="setting-row">
+                            <label>Token Budget/Hour</label>
+                            <input type="number" id="setting-token-budget" value="500000" step="50000">
+                        </div>
+                        <div class="setting-row">
+                            <label>Mistake Learning</label>
+                            <label class="toggle">
+                                <input type="checkbox" id="setting-mistake-learning" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-row">
+                            <label>Aggressive Recording</label>
+                            <label class="toggle">
+                                <input type="checkbox" id="setting-aggressive-recording" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="settings-card">
+                        <h3>Appearance</h3>
+                        <div class="setting-row">
+                            <label>Theme</label>
+                            <select id="setting-theme">
+                                <option value="dark">Dark</option>
+                                <option value="light">Light</option>
+                                <option value="sepia">Sepia</option>
+                            </select>
+                        </div>
+                        <div class="setting-row">
+                            <label>Editor Font</label>
+                            <select id="setting-font">
+                                <option value="Merriweather">Merriweather (Serif)</option>
+                                <option value="Inter">Inter (Sans)</option>
+                                <option value="JetBrains Mono">JetBrains Mono (Mono)</option>
+                            </select>
+                        </div>
+                        <div class="setting-row">
+                            <label>Font Size</label>
+                            <input type="range" id="setting-font-size" min="12" max="24" value="16">
+                            <span class="setting-value" id="setting-font-size-val">16px</span>
+                        </div>
+                        <div class="setting-row">
+                            <label>Line Height</label>
+                            <input type="range" id="setting-line-height" min="1.2" max="2.5" step="0.1" value="1.8">
+                            <span class="setting-value" id="setting-line-height-val">1.8</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <!-- RIGHT SIDEBAR (15%) — Characters, Relations, History -->
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <aside id="right-sidebar" class="sidebar-right">
+
+            <!-- Character Selector -->
+            <div class="right-section">
+                <div class="right-header">
+                    <span class="right-title">👤 Characters</span>
+                    <button class="right-action" id="btn-add-char-right">+</button>
+                </div>
+                <div class="char-list" id="char-list">
+                    <div class="queue-empty">No characters loaded</div>
+                </div>
+            </div>
+
+            <!-- Selected Character Detail -->
+            <div class="right-section character-detail" id="char-detail">
+                <div class="char-detail-header">
+                    <div class="char-detail-avatar" id="detail-avatar" style="background: linear-gradient(135deg, #667eea, #764ba2);"></div>
+                    <div class="char-detail-name" id="detail-name"></div>
+                    <div class="char-detail-role" id="detail-role"></div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="detail-tabs">
+                    <button class="detail-tab active" data-tab="profile">Profile</button>
+                    <button class="detail-tab" data-tab="relations">Relations</button>
+                    <button class="detail-tab" data-tab="timeline">Timeline</button>
+                    <button class="detail-tab" data-tab="talents">Talents</button>
+                </div>
+
+                <!-- Profile Tab -->
+                <div class="detail-panel active" id="tab-profile">
+                    <div class="detail-field">
+                        <label>Age</label>
+                        <span id="detail-age"></span>
+                    </div>
+                    <div class="detail-field">
+                        <label>Origin</label>
+                        <span id="detail-origin"></span>
+                    </div>
+                    <div class="detail-field">
+                        <label>Motivation</label>
+                        <span id="detail-motivation"></span>
+                    </div>
+                    <div class="detail-field">
+                        <label>Fear</label>
+                        <span id="detail-fear"></span>
+                    </div>
+                    <div class="detail-field">
+                        <label>Voice</label>
+                        <span id="detail-voice"></span>
+                    </div>
+                    <div class="detail-field">
+                        <label>Appearance</label>
+                        <span id="detail-appearance"></span>
+                    </div>
+                </div>
+
+                <!-- Relations Tab -->
+                <div class="detail-panel" id="tab-relations">
+                    <div class="relation-tree" id="relation-tree">
+                        <div class="queue-empty">No relations loaded</div>
+                    </div>
+                    <div class="relation-list">
+                        <div class="queue-empty">No relations loaded</div>
+                    </div>
+                </div>
+
+                <!-- Timeline Tab -->
+                <div class="detail-panel" id="tab-timeline">
+                    <div class="timeline-vertical" id="char-timeline">
+                        <div class="queue-empty">No timeline loaded</div>
+                    </div>
+                </div>
+
+                <!-- Talents Tab -->
+                <div class="detail-panel" id="tab-talents">
+                    <div class="queue-empty">No talents loaded</div>
+                    <div class="talent-grid" style="display:none;">
+                        <div class="talent-item"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chapter Context -->
+            <div class="right-section">
+                <div class="right-header">
+                    <span class="right-title">📖 Chapter Context</span>
+                </div>
+                <div class="context-list" id="context-list">
+                    <div class="context-item">
+                        <span class="context-label">POV</span>
+                        <span class="context-value" id="ctx-pov"></span>
+                    </div>
+                    <div class="context-item">
+                        <span class="context-label">Setting</span>
+                        <span class="context-value" id="ctx-setting"></span>
+                    </div>
+                    <div class="context-item">
+                        <span class="context-label">Time</span>
+                        <span class="context-value" id="ctx-time"></span>
+                    </div>
+                    <div class="context-item">
+                        <span class="context-label">Mood</span>
+                        <span class="context-value" id="ctx-mood"></span>
+                    </div>
+                    <div class="context-item">
+                        <span class="context-label">Weather</span>
+                        <span class="context-value" id="ctx-weather"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Stats -->
+            <div class="right-section">
+                <div class="right-header">
+                    <span class="right-title">📊 Session Stats</span>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-number" id="stat-tokens">0</div>
+                        <div class="stat-label">Tokens</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number" id="stat-revisions">0</div>
+                        <div class="stat-label">Revisions</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number" id="stat-mistakes">0</div>
+                        <div class="stat-label">Mistakes</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number" id="stat-time">0:00</div>
+                        <div class="stat-label">Elapsed</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- MODALS -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+
+    <!-- Generate Chapter Modal -->
+    <div class="modal" id="modal-generate" style="display: none;">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>✨ Generate Chapter</h3>
+                <button class="modal-close" data-modal="generate">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Chapter Title</label>
+                        <input type="text" id="gen-chapter-title" placeholder="Chapter title">
+                </div>
+                <div class="form-group">
+                    <label>Prompt / Scene Description</label>
+                    <textarea id="gen-prompt" rows="4" placeholder="Scene description"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Target Words</label>
+                        <input type="number" id="gen-word-target" value="2000" min="500" max="10000" step="500">
+                    </div>
+                    <div class="form-group">
+                            <label>Priority</label>
+                            <select id="gen-priority">
+                                <option value="critical">Critical</option>
+                                <option value="high" selected>High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Context Strategy</label>
+                    <div class="checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" checked id="ctx-characters"> Character Bibles
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" checked id="ctx-outline"> Plot Outline
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" checked id="ctx-previous"> Previous Chapter
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="ctx-research"> Research Notes
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-modal="generate">Cancel</button>
+                <button class="btn btn-primary" id="btn-gen-confirm">
+                    <span class="btn-icon">✨</span> Generate
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Character Modal -->
+    <div class="modal" id="modal-character" style="display: none;">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>👤 Add Character</h3>
+                <button class="modal-close" data-modal="character">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" id="char-name" placeholder="Character name">
+                    </div>
+                    <div class="form-group">
+                        <label>Role</label>
+                        <select id="char-role">
+                            <option value="protagonist">Protagonist</option>
+                            <option value="antagonist">Antagonist</option>
+                            <option value="supporting">Supporting</option>
+                            <option value="minor">Minor</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>One-line Description</label>
+                        <input type="text" id="char-oneline" placeholder="Character summary">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Age</label>
+                        <input type="number" id="char-age" placeholder="Age">
+                    </div>
+                    <div class="form-group">
+                        <label>Origin</label>
+                          <input type="text" id="char-origin" placeholder="Origin">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Motivation</label>
+                    <textarea id="char-motivation" rows="2" placeholder="What drives this character?"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Fear</label>
+                    <textarea id="char-fear" rows="2" placeholder="What are they afraid of?"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Voice / Speech Pattern</label>
+                    <textarea id="char-voice" rows="2" placeholder="How do they speak?"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-modal="character">Cancel</button>
+                <button class="btn btn-primary" id="btn-char-save">Save Character</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

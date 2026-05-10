@@ -1,0 +1,8 @@
+# NovelForge Frontend Requirements
+# Install: pip install -r requirements_frontend.txt
+
+# WebSocket server
+websockets>=12.0
+
+# HTTP server (built-in, no extra dep needed)
+# asyncio (built-in)
