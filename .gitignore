@@ -1,1 +1,4 @@
-Nothing needs to be added to .gitignore since only a Python source file (`novelforge_v2.py`) was modified and there are no build artifacts, dependencies, or temporary files in the changes.
+```
+# Documentation
+CODE_REVIEW_REPORT.md
+```
