@@ -41,7 +41,7 @@ import logging
 # MCP SDK
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-from mcp.client.streamable_http import streamable_http_client
+from mcp.client.streamable_http import streamablehttp_client
 
 # External
 import aiohttp
